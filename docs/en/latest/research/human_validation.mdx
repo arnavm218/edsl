@@ -84,6 +84,32 @@ The left join keeps every model prediction, including records that have no human
 
 Inspect unmatched records in `comparison` to see what still needs human review. Inspect disagreements in `reviewed` alongside the original text and evidence to understand their cause. Looking separately at Billing, Access, and Feature request can show a category-specific problem hidden by the overall agreement.
 
+## Compare answer distributions
+
+Matching records one by one fits labeling tasks, where each record has a correct answer. When you use agents to simulate survey respondents, there is usually no correct answer for any one respondent. The question is whether the simulated respondents, taken together, answer like the people they represent. `ResultsFidelity` compares the two answer distributions for each question:
+
+```python
+from edsl.results.extras import ResultsFidelity
+
+simulated = survey.by(agents).by(models).run()
+human = Coop().get_human_survey_responses(human_survey_uuid)
+
+fidelity = ResultsFidelity(simulated=simulated, human=human)
+report = fidelity.compare(by="region", n_bootstrap=1000, n_split_half=200, seed=0)
+report.table()
+```
+
+Each row covers one question, model and subgroup. It reports a `distance` between 0 (the same share of respondents chose each option) and 1 (no option was chosen on both sides), along with the number of simulated and human answers. Total variation distance (`metric="tvd"`, the default) is the largest difference, for any set of options, between the share of simulated and human respondents who chose it. Use `metric="jsd"` for Jensen-Shannon distance.
+
+Read each distance against the two optional columns:
+
+- `ci_lower` and `ci_upper` form a bootstrap confidence interval (`n_bootstrap` resamples of the respondents on each side). They show how much the distance could change from sampling alone. Two samples of the same population almost never match exactly, so the interval rarely includes 0 even for a perfect simulation; an interval that excludes 0 does not show that the distributions differ.
+- `human_split_half` is the average distance between two random halves of the human respondents (`n_split_half` splits). Two groups of real people never match exactly, so a simulated distance close to this reference is about as close as the sample size allows. Each half has only half of the human respondents, so the reference is larger than the sampling noise in the full comparison: about 1.4 times larger when the simulated and human samples are the same size.
+
+`by` names an agent trait or scenario key, such as `"region"`; both sides need it. Use `human_weight="weight"` to apply survey weights stored as a trait of each human respondent, and `simulated_weight` for the simulated side. To see where two distributions differ, `fidelity.distributions("question_name")` lists the share of each option on each side.
+
+`ResultsFidelity` compares multiple choice, yes/no, linear scale, Likert and dropdown questions. Checkbox and numerical questions are not supported yet: checkbox answers are sets of options, and numerical answers would first need to be grouped into ranges.
+
 ## Adapt the validation to your task
 
 For multiple-choice classifications, exact agreement is a simple starting point. For checkbox themes, compare the selected sets or each theme separately; for numerical ratings, compare the size and direction of the differences. For free-text outputs, create evaluation questions that capture what you want people to judge, such as factual correctness or usefulness.
