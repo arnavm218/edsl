@@ -76,10 +76,11 @@ def distribution(responses: Sequence[Response]) -> Optional[Distribution]:
     total = sum(weight for _, weight in responses)
     if total <= 0:
         return None
-    shares: dict[Hashable, float] = defaultdict(float)
+    weights: dict[Hashable, float] = defaultdict(float)
     for answer, weight in responses:
-        shares[answer] += weight / total
-    return dict(shares)
+        weights[answer] += weight
+    # Divide once per answer so rounding errors don't accumulate.
+    return {answer: weight / total for answer, weight in weights.items()}
 
 
 def total_variation_distance(p: Distribution, q: Distribution) -> float:

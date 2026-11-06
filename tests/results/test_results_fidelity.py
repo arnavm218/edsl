@@ -399,3 +399,15 @@ def test_human_results_from_stored_responses():
         ("north", pytest.approx(0.5)),
         ("south", 0),
     ]
+
+
+def test_unanimous_answers_give_exact_shares_and_distance():
+    # Summing many small fractions used to leave 1.0000000000000002.
+    simulated = make_results(["red"] * 10)
+    human = make_results(["blue"] * 10)
+    fidelity = ResultsFidelity(simulated, human)
+    assert only(fidelity.compare(questions=["color"]))["distance"] == 1.0
+    shares = {
+        row["answer"]: row["simulated_share"] for row in fidelity.distributions("color")
+    }
+    assert shares["red"] == 1.0
